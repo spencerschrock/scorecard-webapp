@@ -277,8 +277,6 @@ func init() {
         },
         "metadata": {
           "type": "string",
-          "x-nullable": true,
-          "x-omitempty": false,
           "x-order": 5
         },
         "repo": {
@@ -626,8 +624,6 @@ func init() {
         },
         "metadata": {
           "type": "string",
-          "x-nullable": true,
-          "x-omitempty": false,
           "x-order": 5
         },
         "repo": {
