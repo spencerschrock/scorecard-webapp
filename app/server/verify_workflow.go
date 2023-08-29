@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v42/github"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/rhysd/actionlint"
 )
 
@@ -247,11 +248,16 @@ func isCommitHash(s string) bool {
 type githubVerifier struct {
 	ctx    context.Context
 	client *github.Client
+	cache  *lru.Cache[string, bool]
 }
 
 // contains currently makes two "core" API calls: one for the default branch, and one to compare the target hash
 // This could also be done with the search commits API and a query of q=hash:<sha>+repo:<owner>/<repo>.
 func (g *githubVerifier) contains(owner, repo, hash string) (bool, error) {
+	key := owner + "/" + repo + "@" + hash
+	if repoContains, ok := g.cache.Get(key); ok {
+		return repoContains, nil
+	}
 	defaultBranch, err := g.defaultBranch(owner, repo)
 	if err != nil {
 		return false, err
@@ -261,13 +267,16 @@ func (g *githubVerifier) contains(owner, repo, hash string) (bool, error) {
 	if err != nil {
 		if resp.StatusCode == http.StatusNotFound {
 			// NotFound can be returned for some divergent cases: "404 No common ancestor between ..."
+			g.cache.Add(key, false)
 			return false, nil
 		}
 		return false, fmt.Errorf("error comparing revisions: %w", err)
 	}
 
 	// Target should be behind or at the base ref if it is considered contained.
-	return diff.GetStatus() == "behind" || diff.GetStatus() == "identical", nil
+	result := diff.GetStatus() == "behind" || diff.GetStatus() == "identical"
+	g.cache.Add(key, result)
+	return result, nil
 }
 
 func (g *githubVerifier) defaultBranch(owner, repo string) (string, error) {

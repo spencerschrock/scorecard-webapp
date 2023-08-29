@@ -36,6 +36,7 @@ import (
 	"github.com/go-openapi/runtime/middleware"
 	"github.com/go-openapi/strfmt"
 	"github.com/google/go-github/v42/github"
+	lru "github.com/hashicorp/golang-lru/v2"
 	merkleproof "github.com/transparency-dev/merkle/proof"
 	"github.com/transparency-dev/merkle/rfc6962"
 	"gocloud.dev/blob"
@@ -44,6 +45,15 @@ import (
 	"github.com/ossf/scorecard-webapp/app/generated/restapi/operations/results"
 	"github.com/ossf/scorecard-webapp/app/server/internal/hashedrekord"
 )
+
+//nolint:gochecknoinits
+func init() {
+	lru, err := lru.New[string, bool](lruSize)
+	if err != nil {
+		panic(err)
+	}
+	commitLRU = lru
+}
 
 const (
 	// OID source: https://github.com/sigstore/fulcio/blob/96ef49cc7662912ba37d46f738757e8d8d5b5355/docs/oid-info.md#L33
@@ -54,6 +64,8 @@ const (
 	resultsBucket     = "gs://ossf-scorecard-results"
 	resultsFile       = "results.json"
 	noTlogIndex       = 0
+
+	lruSize = 1024
 )
 
 var (
@@ -68,6 +80,8 @@ var (
 	errNoTlogEntry              = errors.New("no transparency log entry found")
 	errNotRekordEntry           = errors.New("not a rekord entry")
 	errMismatchedTlogEntry      = errors.New("tlog entry does not match payload")
+
+	commitLRU *lru.Cache[string, bool]
 )
 
 type certInfo struct {
@@ -229,6 +243,7 @@ func getAndVerifyWorkflowContent(ctx context.Context,
 	verifier := &githubVerifier{
 		ctx:    ctx,
 		client: client,
+		cache:  commitLRU,
 	}
 	// Verify scorecard workflow.
 	return verifyScorecardWorkflow(workflowContent, verifier)
