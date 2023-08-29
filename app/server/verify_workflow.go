@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/google/go-github/v42/github"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -29,6 +30,8 @@ import (
 
 const (
 	workflowRestrictionLink = "https://github.com/ossf/scorecard-action#workflow-restrictions"
+
+	lruSize = 1024 // TODO how to size?
 )
 
 var (
@@ -48,6 +51,17 @@ var (
 	errNoDefaultBranch              = errors.New("no default branch")
 
 	reCommitSHA = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
+
+	imposterCommitLRU *lru.Cache[string, bool]
+
+	InitImposterCommitLRU func() error = sync.OnceValue(func() error {
+		var err error
+		imposterCommitLRU, err = lru.New[string, bool](lruSize)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
 )
 
 // TODO(#290): retrieve the runners dynamically.

@@ -24,11 +24,16 @@ import (
 
 	"github.com/ossf/scorecard-webapp/app/generated/restapi"
 	"github.com/ossf/scorecard-webapp/app/generated/restapi/operations"
+	"github.com/ossf/scorecard-webapp/app/server"
 )
 
 func main() {
 	swaggerSpec, err := loads.Embedded(restapi.SwaggerJSON, restapi.FlatSwaggerJSON)
 	if err != nil {
+		log.Fatalln(err)
+	}
+
+	if err := server.InitImposterCommitLRU(); err != nil {
 		log.Fatalln(err)
 	}
 
